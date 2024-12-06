@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, prelude::*, BufReader};
 
@@ -9,6 +10,8 @@ fn main() -> std::io::Result<()> {
     right.sort_unstable();
     let diff = calculate_diff(&left, &right);
     println!("diff={diff}");
+    let similarity = calculate_similarity(&left, &right);
+    println!("similarity={similarity}");
     Ok(())
 }
 
@@ -26,6 +29,23 @@ fn read_data<R: BufRead>(input: R) -> io::Result<(Vec<i64>, Vec<i64>)> {
 
 fn calculate_diff(left: &[i64], right: &[i64]) -> i64 {
     left.iter().zip(right.iter()).map(|(x,y)| dist(*x, *y)).sum()
+}
+
+fn calculate_similarity(left: &[i64], right: &[i64]) -> i64 {
+    let counts = calculate_counts(right);
+    let mut sum = 0;
+    for val in left {
+        sum += val * counts.get(val).unwrap_or(&0);
+    }
+    sum
+}
+
+fn calculate_counts(data: &[i64]) -> HashMap<i64, i64> {
+    let mut r = HashMap::new();
+    for val in data.iter() {
+        *r.entry(*val).or_insert(0) += 1i64;
+    }
+    r
 }
 
 fn parse_i64(val: Option<&str>) -> io::Result<i64> {
