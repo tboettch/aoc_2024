@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc d228fc25078b074301e227f6120d4ff05198a7a007aade07ad065a7cd92c294d # shrinks to board = Board { data: [72, 79, 53, 65, 65, 97, 48, 48, 65], width: 1, height: 9 }, target = "5OH"
