@@ -8,6 +8,8 @@ fn main() -> io::Result<()> {
     assert_eq!(board.width * board.height, board.data.len());
     let count = count_word(&board, b"XMAS", false);
     println!("count={count}");
+    let cross_count = count_cross(&board);
+    println!("cross_count={cross_count}");
     Ok(())
 }
 
@@ -45,7 +47,7 @@ impl Display for Board {
 struct Idx(Dimension, Dimension);
 
 impl Idx {
-    fn add(&self, offset: &(isize, isize)) -> Option<Self> {
+    fn add(&self, offset: (isize, isize)) -> Option<Self> {
        Some(Idx(self.0.checked_add_signed(offset.0)?, self.1.checked_add_signed(offset.1)?))
     }
 }
@@ -86,9 +88,34 @@ fn check_direction(board: &Board, target: &[Token], start: Idx, direction: &(isi
         if *board.get(pos?)? != *c {
             return None;
         }
-        pos = pos.unwrap().add(direction);
+        pos = pos.unwrap().add(*direction);
     }
     Some(())
+}
+
+fn count_cross(board: &Board) -> u32 {
+    let mut count = 0;
+    for y in 0..board.height {
+        for x in 0..board.width {
+            let index = Idx(x,y);
+            if check_cross(board, index).is_some() { count += 1 }
+        }
+    }
+    count
+}
+
+fn check_cross(board: &Board, index: Idx) -> Option<()> {
+    if *board.get(index)? != b'A' {
+        return None;
+    }
+    let ul = *board.get(index.add((-1, -1))?)?;
+    let dr = *board.get(index.add((1, 1))?)?;
+    let ur = *board.get(index.add((1, -1))?)?;
+    let dl = *board.get(index.add((-1, 1))?)?;
+
+    let left_cross = (ul == b'M' && dr == b'S') || (ul == b'S' && dr == b'M');
+    let right_cross = (ur == b'M' && dl == b'S') || (ur == b'S' && dl == b'M');
+    if left_cross && right_cross { Some(()) } else { None }
 }
 
 fn read_data(filename: &str) -> io::Result<Board> {
