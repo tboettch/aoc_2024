@@ -1,9 +1,10 @@
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::fs::File;
 use std::ops::Index;
 use std::io::{self, BufRead, BufReader};
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone, Hash)]
 enum Direction {
     Up, Right, Down, Left
 }
@@ -102,7 +103,7 @@ impl Board {
         index.0 + self.width * index.1
     }
 
-    fn render_visited(&self, visited: &Vec<bool>) -> String {
+    fn render_visited(&self, visited: &Vec<HashSet<Direction>>) -> String {
         use std::fmt::Write;
         let mut r = String::with_capacity(self.data.len());
         for y in 0..self.height {
@@ -110,11 +111,11 @@ impl Board {
                 let pos = Position(x,y);
                 match self[&pos] {
                     Square::Empty => {
-                        if visited[self.raw_index(&pos)] {
-                            write!(r, "X").unwrap();
-                        } else {
-                            write!(r, ".").unwrap();
-                        }
+                        let directions = &visited[self.raw_index(&pos)];
+                        let horizontal = directions.contains(&Direction::Left) || directions.contains(&Direction::Right);
+                        let vertical = directions.contains(&Direction::Up) || directions.contains(&Direction::Down);
+                        let c = if vertical && horizontal {"+"} else if vertical {"|"} else if horizontal {"-"} else {"."};
+                        write!(r, "{}", c).unwrap();
                     },
                     Square::Obstacle => write!(r, "#").unwrap(),
                 }
@@ -135,20 +136,24 @@ fn main() -> io::Result<()> {
 }
 
 fn count_walk_board(board: &Board) -> u32 {
-    let visited = walk_board(board);
+    let (_, visited) = walk_board(board);
     // println!("{board}");
     // println!("----------------");
     // println!("{}", board.render_visited(&visited));
-    visited.iter().filter(|x| **x).count() as u32
+    visited.iter().filter(|x| !x.is_empty()).count() as u32
 }
 
-fn walk_board(board: &Board) -> Vec<bool> {
-    let mut visited = vec![false; board.data.len()];
+/// Walks the board, recording position visited, including multiple directions at each position.
+/// The returned boolean is true if the path is a loop, and false if not (i.e. the guard leaves the board).
+fn walk_board(board: &Board) -> (bool, Vec<HashSet<Direction>>) {
+    let mut visited = vec![HashSet::new(); board.data.len()];
     let mut pos = board.guard_init.pos.clone();
     let mut dir = board.guard_init.dir;
 
     loop {
-        visited[board.raw_index(&pos)] = true;
+        if !visited[board.raw_index(&pos)].insert(dir) {
+            return (true, visited)
+        }
         let next_pos = pos.apply_offset(dir.offset());
         if next_pos.is_none() {
             break;
@@ -161,7 +166,7 @@ fn walk_board(board: &Board) -> Vec<bool> {
         }
     }
 
-    visited
+    (false, visited)
 }
 
 fn read_data(filename: &str) -> io::Result<Board> {
