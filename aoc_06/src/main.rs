@@ -8,8 +8,39 @@ enum Direction {
     Up, Right, Down, Left
 }
 
+impl Direction {
+    fn turn(&self) -> Self {
+        use Direction::*;
+        match self {
+            Up => Right,
+            Right => Down,
+            Down => Left,
+            Left => Up
+        }
+    }
+    
+    fn offset(&self) -> Offset {
+        use Direction::*;
+        match self {
+            Up => Offset(0, -1),
+            Right => Offset(1, 0),
+            Down => Offset(0, 1),
+            Left => Offset(-1, 0),
+        }
+    }
+}
+
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
 struct Position(usize, usize);
+
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
+struct Offset(isize, isize);
+
+impl Position {
+    fn apply_offset(&self, off: Offset) -> Option<Self> {
+        Some(Position(self.0.checked_add_signed(off.0)?, self.1.checked_add_signed(off.1)?))
+    }
+}
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
 enum Square {
@@ -31,10 +62,10 @@ struct Board {
     guard_init: Guard,
 }
 
-impl Index<Position> for Board {
+impl Index<&Position> for Board {
     type Output = Square;
-    fn index(&self, index: Position) -> &Self::Output {
-        &self.data[index.0 + self.width * index.1]
+    fn index(&self, index: &Position) -> &Self::Output {
+        &self.data[self.raw_index(&index)]
     }
 }
 
@@ -47,7 +78,7 @@ impl Display for Board {
                 if pos == self.guard_init.pos {
                     write!(f, "^")?;
                 } else {
-                    match self[pos] {
+                    match self[&pos] {
                         Square::Empty => write!(f, ".")?,
                         Square::Obstacle => write!(f, "#")?,
                     }
@@ -60,20 +91,52 @@ impl Display for Board {
 }
 
 impl Board {
-    fn at(&self, index: Position) -> Option<&Square> {
+    fn at(&self, index: &Position) -> Option<&Square> {
         if index.0 >= self.width || index.1 >= self.height {
             return None;
         }
         Some(&self[index])
     }
+
+    fn raw_index(&self, index: &Position) -> usize {
+        index.0 + self.width * index.1
+    }
 }
 
 fn main() -> io::Result<()> {
-    let filename = "example.txt";
-    // let filename = "input.txt";
+    // let filename = "example.txt";
+    let filename = "input.txt";
     let board = read_data(filename)?;
-    println!("{board}");
+    // println!("{board}");
+    println!("count: {}", count_walk_board(&board));
     Ok(())
+}
+
+fn count_walk_board(board: &Board) -> u32 {
+    let visited = walk_board(board);
+    visited.iter().filter(|x| **x).count() as u32
+}
+
+fn walk_board(board: &Board) -> Vec<bool> {
+    let mut visited = vec![false; board.data.len()];
+    let mut pos = board.guard_init.pos.clone();
+    let mut dir = board.guard_init.dir;
+
+    loop {
+        visited[board.raw_index(&pos)] = true;
+        let next_pos = pos.apply_offset(dir.offset());
+        if next_pos.is_none() {
+            break;
+        }
+        let next_pos = next_pos.unwrap();
+        match board.at(&next_pos) {
+            Some(Square::Empty) => pos = next_pos,
+            Some(Square::Obstacle) => dir = dir.turn(),
+            None => break,
+        }
+    }
+
+    visited
 }
 
 fn read_data(filename: &str) -> io::Result<Board> {
