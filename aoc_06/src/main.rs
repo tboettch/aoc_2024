@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::fs::File;
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 use std::io::{self, BufRead, BufReader};
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone, Hash)]
@@ -70,6 +70,13 @@ impl Index<&Position> for Board {
     }
 }
 
+impl IndexMut<&Position> for Board {
+    fn index_mut(&mut self, index: &Position) -> &mut Self::Output {
+        let i = self.raw_index(&index);
+        &mut self.data[i]
+    }
+}
+
 impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         assert_eq!(self.guard_init.dir, Direction::Up);
@@ -132,6 +139,7 @@ fn main() -> io::Result<()> {
     let board = read_data(filename)?;
     // println!("{board}");
     println!("count: {}", count_walk_board(&board));
+    println!("potential loops: {}", count_potential_loops(&board));
     Ok(())
 }
 
@@ -141,6 +149,25 @@ fn count_walk_board(board: &Board) -> u32 {
     // println!("----------------");
     // println!("{}", board.render_visited(&visited));
     visited.iter().filter(|x| !x.is_empty()).count() as u32
+}
+
+fn count_potential_loops(board: &Board) -> u32 {
+    let (is_loop, visited) = walk_board(board);
+    assert!(!is_loop);
+    let mut count: u32 = 0;
+    for y in 0..board.height {
+        for x in 0..board.width {
+            // Only positions where the guard walked need to be checked
+            let pos = Position(x,y);
+            if pos != board.guard_init.pos && !visited[board.raw_index(&pos)].is_empty() {
+                let mut board = board.clone();
+                board[&pos] = Square::Obstacle;
+                let (is_loop, _) = walk_board(&board);
+                if is_loop { count += 1; }
+            }
+        }
+    }
+    count
 }
 
 /// Walks the board, recording position visited, including multiple directions at each position.
