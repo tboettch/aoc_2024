@@ -1,7 +1,7 @@
-use std::{collections::{HashMap, HashSet}, fs::File, io::{self, prelude::*, BufReader}, num::ParseIntError};
+use std::{cmp::Ordering, collections::{HashMap, HashSet}, fs::File, io::{self, prelude::*, BufReader}, num::ParseIntError};
 use winnow::{ascii::digit1, combinator::{repeat, separated, separated_pair, terminated}, prelude::*, token::literal};
 
-type Rules = HashMap<u32, Vec<u32>>;
+type Rules = HashMap<u32, HashSet<u32>>;
 
 fn main() -> io::Result<()> {
     // let filename = "example.txt";
@@ -10,6 +10,7 @@ fn main() -> io::Result<()> {
     // println!("rules={rules:#?}");
     // println!("data={data:#?}");
     println!("sum of midpoints: {}", sum_valid_midpoints(&rules, &data));
+    println!("sum of invalid midpoints: {}", sum_invalid_midpoints(&rules, &data));
     Ok(())
 }
 
@@ -45,6 +46,30 @@ fn midpoint(pages: &[u32]) -> u32 {
     pages[mid]
 }
 
+fn sum_invalid_midpoints(rules: &Rules, data: &Vec<Vec<u32>>) -> u32 {
+    data.iter()
+        .inspect(|pages| {
+            if pages.len() % 2 == 0 {
+                panic!("Unexpected even length page data: {pages:?}");
+            }
+        })
+        .filter(|pages| !validate_pages(&rules, pages))
+        .map(|pages| fix_order(rules, pages))
+        .map(|pages| midpoint(&pages))
+        .sum()
+}
+
+fn fix_order(rules: &Rules, data: &Vec<u32>) -> Vec<u32> {
+    let mut data = data.clone();
+    // Assumes that the rules constitute a partial order
+    data.sort_by(|l, r| {
+        if rules.get(l).map_or(false, |set| set.contains(r)) { return Ordering::Less }
+        if rules.get(r).map_or(false, |set| set.contains(l)) { return Ordering::Greater }
+        Ordering::Equal
+    });
+    data
+}
+
 fn read_input(filename: &str) -> io::Result<(Rules, Vec<Vec<u32>>)> {
     let mut buf = String::new();
     File::open(filename)?.read_to_string(&mut buf)?;
@@ -56,8 +81,8 @@ fn read_input(filename: &str) -> io::Result<(Rules, Vec<Vec<u32>>)> {
 
 fn full_input(input: &mut &str) -> PResult<(Rules, Vec<Vec<u32>>)> {
     let rules: Vec<(u32, u32)> = repeat(1.., terminated(rule, literal('\n'))).parse_next(input)?;
-    let rules = rules.into_iter().fold(HashMap::new(), |mut acc: HashMap<u32, Vec<u32>>, (k, v)| {
-        acc.entry(k).or_default().push(v);
+    let rules = rules.into_iter().fold(HashMap::new(), |mut acc: HashMap<u32, HashSet<u32>>, (k, v)| {
+        acc.entry(k).or_default().insert(v);
         acc
     });
     literal('\n').parse_next(input)?;
