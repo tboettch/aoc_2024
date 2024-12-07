@@ -101,6 +101,28 @@ impl Board {
     fn raw_index(&self, index: &Position) -> usize {
         index.0 + self.width * index.1
     }
+
+    fn render_visited(&self, visited: &Vec<bool>) -> String {
+        use std::fmt::Write;
+        let mut r = String::with_capacity(self.data.len());
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let pos = Position(x,y);
+                match self[&pos] {
+                    Square::Empty => {
+                        if visited[self.raw_index(&pos)] {
+                            write!(r, "X").unwrap();
+                        } else {
+                            write!(r, ".").unwrap();
+                        }
+                    },
+                    Square::Obstacle => write!(r, "#").unwrap(),
+                }
+            }
+            writeln!(r, "").unwrap();
+        }
+        r
+    }
 }
 
 fn main() -> io::Result<()> {
@@ -114,6 +136,9 @@ fn main() -> io::Result<()> {
 
 fn count_walk_board(board: &Board) -> u32 {
     let visited = walk_board(board);
+    // println!("{board}");
+    // println!("----------------");
+    // println!("{}", board.render_visited(&visited));
     visited.iter().filter(|x| **x).count() as u32
 }
 
