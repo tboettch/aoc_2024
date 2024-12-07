@@ -226,16 +226,18 @@ fn count_walk_board(board: &Board) -> u32 {
 fn count_potential_loops(board: &Board) -> u32 {
     let (is_loop, visited) = walk_board(board);
     assert!(!is_loop);
+    let mut board = board.clone();
     let mut count: u32 = 0;
     for y in 0..board.height {
         for x in 0..board.width {
             // Only positions where the guard walked need to be checked
             let pos = Position(x,y);
             if pos != board.guard_init.pos && !visited[board.raw_index(&pos)].is_empty() {
-                let mut board = board.clone();
+                debug_assert!(board[&pos] == Square::Empty);
                 board[&pos] = Square::Obstacle;
                 let (is_loop, _) = walk_board(&board);
                 if is_loop { count += 1; }
+                board[&pos] = Square::Empty;
             }
         }
     }
