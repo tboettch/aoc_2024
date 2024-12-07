@@ -1,15 +1,28 @@
-use std::collections::HashSet;
 use std::fmt::Display;
 use std::fs::File;
 use std::ops::{Index, IndexMut};
 use std::io::{self, BufRead, BufReader};
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone, Hash)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
 enum Direction {
     Up, Right, Down, Left
 }
 
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Direction::Up => "Up",
+            Direction::Right => "Right",
+            Direction::Down => "Down",
+            Direction::Left => "Left",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 impl Direction {
+    const ALL: [Direction; 4] = [Direction::Up, Direction::Right, Direction::Down, Direction::Left];
+
     fn turn(&self) -> Self {
         use Direction::*;
         match self {
@@ -28,6 +41,68 @@ impl Direction {
             Down => Offset(0, 1),
             Left => Offset(-1, 0),
         }
+    }
+
+    const fn bit_index(&self) -> u8 {
+        match self {
+            Direction::Up => 2u8.pow(0),
+            Direction::Right => 2u8.pow(1),
+            Direction::Down => 2u8.pow(2),
+            Direction::Left => 2u8.pow(3),
+        }
+    }
+}
+
+#[derive(PartialOrd, Ord, PartialEq, Eq, Debug, Clone, Copy)]
+struct DirSet(u8);
+
+impl Default for DirSet {
+    fn default() -> Self {
+        DirSet(0)
+    }
+}
+
+impl DirSet {
+    fn get(&self, dir: &Direction) -> bool {
+        (self.0 & dir.bit_index()) != 0
+    }
+
+    fn set(&mut self, dir: &Direction) {
+        self.0 |= dir.bit_index();
+    }
+
+    fn clear(&mut self, dir: &Direction) {
+        self.0 &= !dir.bit_index()
+    }
+
+    /// Sets the flag for the specified value, returning the previous value.
+    fn get_and_set(&mut self, dir: &Direction) -> bool {
+        let prev = self.get(dir);
+        self.set(dir);
+        prev
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+
+    fn to_symbol(&self) -> char {
+        let horizontal = self.get(&Direction::Left) || self.get(&Direction::Right);
+        let vertical = self.get(&Direction::Up) || self.get(&Direction::Down);
+        if vertical && horizontal {'+'} else if vertical {'|'} else if horizontal {'-'} else {'.'}
+    }
+}
+
+impl Display for DirSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[")?;
+        let mut first = true;
+        for dir in Direction::ALL {
+            if first { first = false } else { write!(f, ",")?; }
+            write!(f, "{dir}")?;
+        }
+        write!(f, "]")?;
+        Ok(())
     }
 }
 
@@ -110,7 +185,7 @@ impl Board {
         index.0 + self.width * index.1
     }
 
-    fn render_visited(&self, visited: &Vec<HashSet<Direction>>) -> String {
+    fn render_visited(&self, visited: &Vec<DirSet>) -> String {
         use std::fmt::Write;
         let mut r = String::with_capacity(self.data.len());
         for y in 0..self.height {
@@ -119,10 +194,7 @@ impl Board {
                 match self[&pos] {
                     Square::Empty => {
                         let directions = &visited[self.raw_index(&pos)];
-                        let horizontal = directions.contains(&Direction::Left) || directions.contains(&Direction::Right);
-                        let vertical = directions.contains(&Direction::Up) || directions.contains(&Direction::Down);
-                        let c = if vertical && horizontal {"+"} else if vertical {"|"} else if horizontal {"-"} else {"."};
-                        write!(r, "{}", c).unwrap();
+                        write!(r, "{}", directions.to_symbol()).unwrap();
                     },
                     Square::Obstacle => write!(r, "#").unwrap(),
                 }
@@ -172,13 +244,13 @@ fn count_potential_loops(board: &Board) -> u32 {
 
 /// Walks the board, recording position visited, including multiple directions at each position.
 /// The returned boolean is true if the path is a loop, and false if not (i.e. the guard leaves the board).
-fn walk_board(board: &Board) -> (bool, Vec<HashSet<Direction>>) {
-    let mut visited = vec![HashSet::new(); board.data.len()];
+fn walk_board(board: &Board) -> (bool, Vec<DirSet>) {
+    let mut visited = vec![DirSet::default(); board.data.len()];
     let mut pos = board.guard_init.pos.clone();
     let mut dir = board.guard_init.dir;
 
     loop {
-        if !visited[board.raw_index(&pos)].insert(dir) {
+        if visited[board.raw_index(&pos)].get_and_set(&dir) {
             return (true, visited)
         }
         let next_pos = pos.apply_offset(dir.offset());
