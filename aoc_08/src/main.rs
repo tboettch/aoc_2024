@@ -249,6 +249,7 @@ mod tests {
         #[test]
         fn check_gcd(x: isize, y: isize) {
             let d = gcd(x,y);
+            assert!(d > 0 || x == 0 && y == 0);
             assert_eq!(0, x % d);
             assert_eq!(0, y % d);
         }
