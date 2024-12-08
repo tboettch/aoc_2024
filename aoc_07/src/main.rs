@@ -22,11 +22,43 @@ impl Op {
 }
 
 fn main() -> io::Result<()> {
-    let filename = "example.txt";
-    // let filename = "input.txt";
-    let equations = read_input(filename);
-    println!("{equations:?}");
+    // let filename = "example.txt";
+    let filename = "input.txt";
+    let equations = read_input(filename)?;
+    // println!("{equations:?}");
+    println!("sum solveable: {}", sum_solveable(&equations));
     Ok(())
+}
+
+fn sum_solveable(equations: &[Equation]) -> u64 {
+    equations.iter()
+        .filter(|e| solveable(e))
+        .map(|e| e.total)
+        .sum()
+}
+
+fn solveable(equation: &Equation) -> bool {
+    for total in totals(&equation.components) {
+        // println!(" equation: {equation:?}, total: {total}");
+        if total == equation.total {
+            return true;
+        }
+    }
+    false
+}
+
+fn totals(vals: &[u64]) -> Vec<u64> {
+    if vals.len() == 1 {
+        return vals.to_vec();
+    }
+    let subtotals = totals(&vals[..vals.len() - 1]);
+    let mut result = Vec::with_capacity(subtotals.len() * 2);
+    for op in Op::ALL {
+        for subtotal in &subtotals {
+            result.push(op.apply(vals[vals.len() - 1], *subtotal));
+        }
+    }
+    result
 }
 
 fn read_input(filename: &str) -> io::Result<Vec<Equation>> {
