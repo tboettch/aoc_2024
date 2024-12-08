@@ -257,7 +257,7 @@ fn count_potential_loops(board: &Board) -> u32 {
 }
 
 /// Walks the board, recording position visited, including multiple directions at each position. If an initial position is provided, then no path will be returned.
-// If an initial position or visited squares data is provided, then both must be provided. 
+/// If an initial position or visited squares data is provided, then both must be provided. 
 ///
 /// The returned boolean is true if the path is a loop, and false if not (i.e. the guard leaves the board).
 fn walk_board(board: &Board, visited: Option<Vec<DirSet>>, start: Option<&Guard>) -> (bool, Option<Vec<Guard>>) {
