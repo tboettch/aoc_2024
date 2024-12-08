@@ -108,7 +108,7 @@ impl Display for DirSet {
     }
 }
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Hash)]
 struct Position(usize, usize);
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
@@ -126,7 +126,7 @@ enum Square {
     Obstacle
 }
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
 struct Guard {
     pos: Position,
     dir: Direction,
@@ -225,7 +225,7 @@ fn count_walk_board(board: &Board) -> u32 {
     // println!("{board}");
     // println!("----------------");
     // println!("{}", board.render_visited(&visited));
-    let set: HashSet<Position, RandomState> = HashSet::from_iter(path.iter().map(|g| g.pos));
+    let set: HashSet<&Position, RandomState> = HashSet::from_iter(path.iter().map(|g| &g.pos));
     set.len() as u32
 }
 
@@ -243,7 +243,7 @@ fn count_potential_loops(board: &Board) -> u32 {
         // Each step of the loop considers one of the positions in the guard's recorded path as the location of a potential obstacle.
         // The guard's "current" position for the purpose of walking the board is actually the previous entry in the path.
         let obstacle_pos = &guard.pos;
-        let guard = path[i-1];
+        let guard = &path[i-1];
         if *obstacle_pos != board.guard_init.pos && visited[board.raw_index(obstacle_pos)].is_empty() {
             debug_assert!(board[obstacle_pos] == Square::Empty);
             board[obstacle_pos] = Square::Obstacle;
