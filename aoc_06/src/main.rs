@@ -187,6 +187,7 @@ impl Board {
         index.0 + self.width * index.1
     }
 
+    // FIXME: Needs visited data. Could choose to return that again from walk_path(...), or could build it from path data.
     fn render_visited(&self, visited: &Vec<DirSet>) -> String {
         use std::fmt::Write;
         let mut r = String::with_capacity(self.data.len());
@@ -220,6 +221,7 @@ fn main() -> io::Result<()> {
 
 fn count_walk_board(board: &Board) -> u32 {
     let (_, path) = walk_board(board, None, None);
+    let path = path.unwrap();
     // println!("{board}");
     // println!("----------------");
     // println!("{}", board.render_visited(&visited));
@@ -229,21 +231,20 @@ fn count_walk_board(board: &Board) -> u32 {
 
 fn count_potential_loops(board: &Board) -> u32 {
     let (is_loop, path) = walk_board(board, None, None);
+    let path = path.unwrap();
     assert!(!is_loop);
     assert!(!path.is_empty());
 
     let mut board = board.clone();
     let mut visited = vec![DirSet::default(); board.data.len()];
-    // visited[board.raw_index(&board.guard_init.pos)].set(&board.guard_init.dir);
     let mut count: u32 = 0;
     
     for (i, guard) in path.iter().enumerate().skip(1) {
         if guard.pos != board.guard_init.pos && visited[board.raw_index(&guard.pos)].is_empty() {
             debug_assert!(board[&guard.pos] == Square::Empty);
             board[&guard.pos] = Square::Obstacle;
-            let path = path[0..i].to_vec();
+            let path = &path[0..i];
             let (is_loop, _) = walk_board(&board, Some(visited.clone()), Some(path));
-            // let (is_loop, _) = walk_board(&board, None, None);
             if is_loop { count += 1; }
             board[&guard.pos] = Square::Empty;
         }
@@ -252,15 +253,26 @@ fn count_potential_loops(board: &Board) -> u32 {
     count
 }
 
-/// Walks the board, recording position visited, including multiple directions at each position.
+/// Walks the board, recording position visited, including multiple directions at each position. If an initial path is provided, then no path will be returned.
+// If an initial path or visited squares data is provided, then both must be provided. 
+///
 /// The returned boolean is true if the path is a loop, and false if not (i.e. the guard leaves the board).
-fn walk_board(board: &Board, visited: Option<Vec<DirSet>>, path: Option<Vec<Guard>>) -> (bool, Vec<Guard>) {
+fn walk_board(board: &Board, visited: Option<Vec<DirSet>>, path: Option<&[Guard]>) -> (bool, Option<Vec<Guard>>) {
+    assert!(visited.is_some() == path.is_some());
     let mut visited = visited.unwrap_or_else(|| vec![DirSet::default(); board.data.len()]);
-    let mut path = path.unwrap_or_else(|| vec![board.guard_init.clone()]);
-    let mut guard = path.last().unwrap().clone();
+    let mut guard: Guard;
+    let mut build_path: Option<Vec<Guard>>;
+    if let Some(path) = path {
+        guard = path.last().unwrap().clone();
+        build_path = None;
+    } else {
+        guard = board.guard_init.clone();
+        build_path = Some(Vec::new());
+    }
+
     loop {
         if visited[board.raw_index(&guard.pos)].get_and_set(&guard.dir) {
-            return (true, path)
+            return (true, build_path)
         }
         let next_pos = guard.pos.apply_offset(guard.dir.offset());
         if next_pos.is_none() {
@@ -272,10 +284,12 @@ fn walk_board(board: &Board, visited: Option<Vec<DirSet>>, path: Option<Vec<Guar
             Some(Square::Obstacle) => guard.dir = guard.dir.turn(),
             None => break,
         }
-        path.push(guard.clone());
+        if let Some(ref mut path) = build_path {
+            path.push(guard.clone());
+        }
     }
 
-    (false, path)
+    (false, build_path)
 }
 
 fn read_data(filename: &str) -> io::Result<Board> {
