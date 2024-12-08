@@ -1,5 +1,7 @@
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::fs::File;
+use std::hash::RandomState;
 use std::ops::{Index, IndexMut};
 use std::io::{self, BufRead, BufReader};
 
@@ -106,7 +108,7 @@ impl Display for DirSet {
     }
 }
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Copy, Hash)]
 struct Position(usize, usize);
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
@@ -124,7 +126,7 @@ enum Square {
     Obstacle
 }
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Copy)]
 struct Guard {
     pos: Position,
     dir: Direction,
@@ -207,6 +209,7 @@ impl Board {
 
 fn main() -> io::Result<()> {
     // let filename = "example.txt";
+    // let filename = "test.txt";
     let filename = "input.txt";
     let board = read_data(filename)?;
     // println!("{board}");
@@ -216,58 +219,63 @@ fn main() -> io::Result<()> {
 }
 
 fn count_walk_board(board: &Board) -> u32 {
-    let (_, visited) = walk_board(board);
+    let (_, path) = walk_board(board, None, None);
     // println!("{board}");
     // println!("----------------");
     // println!("{}", board.render_visited(&visited));
-    visited.iter().filter(|x| !x.is_empty()).count() as u32
+    let set: HashSet<Position, RandomState> = HashSet::from_iter(path.iter().map(|g| g.pos));
+    set.len() as u32
 }
 
 fn count_potential_loops(board: &Board) -> u32 {
-    let (is_loop, visited) = walk_board(board);
+    let (is_loop, path) = walk_board(board, None, None);
     assert!(!is_loop);
+    assert!(!path.is_empty());
+
     let mut board = board.clone();
+    let mut visited = vec![DirSet::default(); board.data.len()];
+    // visited[board.raw_index(&board.guard_init.pos)].set(&board.guard_init.dir);
     let mut count: u32 = 0;
-    for y in 0..board.height {
-        for x in 0..board.width {
-            // Only positions where the guard walked need to be checked
-            let pos = Position(x,y);
-            if pos != board.guard_init.pos && !visited[board.raw_index(&pos)].is_empty() {
-                debug_assert!(board[&pos] == Square::Empty);
-                board[&pos] = Square::Obstacle;
-                let (is_loop, _) = walk_board(&board);
-                if is_loop { count += 1; }
-                board[&pos] = Square::Empty;
-            }
+    
+    for (i, guard) in path.iter().enumerate().skip(1) {
+        if guard.pos != board.guard_init.pos && visited[board.raw_index(&guard.pos)].is_empty() {
+            debug_assert!(board[&guard.pos] == Square::Empty);
+            board[&guard.pos] = Square::Obstacle;
+            let path = path[0..i].to_vec();
+            let (is_loop, _) = walk_board(&board, Some(visited.clone()), Some(path));
+            // let (is_loop, _) = walk_board(&board, None, None);
+            if is_loop { count += 1; }
+            board[&guard.pos] = Square::Empty;
         }
+        visited[board.raw_index(&path[i-1].pos)].set(&path[i-1].dir);
     }
     count
 }
 
 /// Walks the board, recording position visited, including multiple directions at each position.
 /// The returned boolean is true if the path is a loop, and false if not (i.e. the guard leaves the board).
-fn walk_board(board: &Board) -> (bool, Vec<DirSet>) {
-    let mut visited = vec![DirSet::default(); board.data.len()];
-    let mut pos = board.guard_init.pos.clone();
-    let mut dir = board.guard_init.dir;
-
+fn walk_board(board: &Board, visited: Option<Vec<DirSet>>, path: Option<Vec<Guard>>) -> (bool, Vec<Guard>) {
+    let mut visited = visited.unwrap_or_else(|| vec![DirSet::default(); board.data.len()]);
+    let mut path = path.unwrap_or_else(|| vec![board.guard_init.clone()]);
+    let mut guard = path.last().unwrap().clone();
     loop {
-        if visited[board.raw_index(&pos)].get_and_set(&dir) {
-            return (true, visited)
+        if visited[board.raw_index(&guard.pos)].get_and_set(&guard.dir) {
+            return (true, path)
         }
-        let next_pos = pos.apply_offset(dir.offset());
+        let next_pos = guard.pos.apply_offset(guard.dir.offset());
         if next_pos.is_none() {
             break;
         }
         let next_pos = next_pos.unwrap();
         match board.at(&next_pos) {
-            Some(Square::Empty) => pos = next_pos,
-            Some(Square::Obstacle) => dir = dir.turn(),
+            Some(Square::Empty) => guard.pos = next_pos,
+            Some(Square::Obstacle) => guard.dir = guard.dir.turn(),
             None => break,
         }
+        path.push(guard.clone());
     }
 
-    (false, visited)
+    (false, path)
 }
 
 fn read_data(filename: &str) -> io::Result<Board> {
