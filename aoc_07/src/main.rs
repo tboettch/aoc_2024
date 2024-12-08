@@ -1,5 +1,5 @@
 use std::{fs::File, io::{self, prelude::*}};
-use winnow::{ascii::digit1, combinator::{repeat, separated, terminated, Repeat}, prelude::*, token::literal};
+use winnow::{ascii::digit1, combinator::{repeat, separated, terminated}, prelude::*, token::literal};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct Equation {
@@ -91,4 +91,38 @@ fn equation(input: &mut &str) -> PResult<Equation> {
 
 fn parse_u64(input: &mut &str) -> PResult<u64> {
     digit1.try_map(|s: &str| s.parse()).parse_next(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10000))]
+
+        // Because this is throw-away code, these tests exclude integer overflow cases.
+
+        #[test]
+        fn check_concat(l in (0..1000000u64), r in (0..1000000u64)) {
+            let by_string: u64 = (l.to_string() + r.to_string().as_ref()).parse().unwrap();
+            let by_op = Op::Concat.apply(l, r);
+            assert_eq!(by_op, by_string);
+        }
+
+        #[test]
+        fn check_concat_zero_left(r: u64) {
+            assert_eq!(Op::Concat.apply(0, r), r);
+        }
+
+        #[test]
+        fn check_concat_zero_right(l in (0..1000000u64)) {
+            assert_eq!(Op::Concat.apply(l, 0), l * 10);
+        }
+
+        #[test]
+        fn check_mag(x: u64) {
+            assert_eq!(mag(x) + 1, x.to_string().chars().count() as u32);
+        }
+    }
 }
