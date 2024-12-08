@@ -184,8 +184,9 @@ fn compute_antinodes(annotated_board: &AnnotatedBoard) -> HashSet<Position> {
                 let pos2 = &positions[j];
                 let unit = pos1.diff(pos2).shrink();
                 assert!(!unit.is_zero());
+                result.insert(pos1.clone());
                 for unit in [&unit, &unit.reverse()] {
-                    for x in 0.. {
+                    for x in 1.. {
                         let off = unit.mul(x);
                         if let Some(pos) = pos1.add(&off) {
                             if board.within_bounds(&pos) {
