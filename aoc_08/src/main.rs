@@ -26,6 +26,12 @@ impl Position {
     }
 }
 
+impl Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({},{})", self.0, self.1)
+    }
+}
+
 impl Offset {
     fn mul(&self, scale: isize) -> Self {
         Self(self.0 * scale, self.1 * scale)
@@ -37,6 +43,18 @@ impl Offset {
 
     fn is_zero(&self) -> bool {
         self.0 == 0 && self.1 == 0
+    }
+
+    /// Shrinks this vector down to the smallest integer-valued vector in the same direction
+    fn shrink(&self) -> Self {
+        let d = gcd(self.0, self.1);
+        Self(self.0 / d, self.1 / d)
+    }
+}
+
+impl Display for Offset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({},{})", self.0, self.1)
     }
 }
 
@@ -71,7 +89,7 @@ impl IndexMut<&Position> for Board {
 
 struct AnnotatedBoard {
     board: Board,
-    antenna_positions: HashMap<Token, HashSet<Position>>, // TODO: Tree map might be better here
+    antenna_positions: HashMap<Token, Vec<Position>>, // TODO: Tree map might be better here
 }
 
 impl Display for Board {
@@ -84,7 +102,7 @@ impl Display for Board {
                     Square::Antenna(c) => write!(f, "{}", c as char)?,
                 }
             }
-            writeln!(f, "")?;
+            if y < self.height - 1 { writeln!(f, "")?; }
         }
         Ok(())
     }
@@ -117,8 +135,10 @@ impl Board {
 
     fn render_with_antinodes<'a, Iter: Iterator<Item = &'a Position>>(&self, antinodes: Iter) -> String {
         let mut bytes = self.to_string().into_bytes();
+        // width + 1 accounts for the newlines added in the Display implementation. -1 reflects the lack of trailing newline on the final line.
+        // This might fail on a platform with different line endings (e.g. Windows)
+        assert_eq!(bytes.len(), (self.width + 1) * self.height - 1);
         for pos in antinodes {
-            // width + 1 accounts for the newlines added in the Display implementation
             let i = pos.0 + pos.1 * (self.width + 1);
             if bytes[i] == b'.' {
                 bytes[i] = b'#';
@@ -130,6 +150,7 @@ impl Board {
 
 fn main() -> io::Result<()> {
     // let filename = "example.txt";
+    // let filename = "example2.txt";
     let filename = "input.txt";
     let board = read_data(filename)?;
     // println!("{board}");
@@ -137,16 +158,16 @@ fn main() -> io::Result<()> {
     // println!("antennas: {:?}", annotated_board.antenna_positions);
     let antinodes = compute_antinodes(&annotated_board);
     println!("antinodes count: {:?}", antinodes.len());
-    // println!("{}", annotated_board.board.render_with_antinodes(antinodes.iter()));
+    println!("{}", annotated_board.board.render_with_antinodes(antinodes.iter()));
     Ok(())
 }
 
 fn annotate_board(board: Board) -> AnnotatedBoard {
-    let mut map: HashMap<u8, HashSet<Position>> = HashMap::new();
+    let mut map: HashMap<u8, Vec<Position>> = HashMap::new();
     for (i, square) in board.data.iter().enumerate() {
         if let Square::Antenna(c) = square {
             let pos = board.position_from_index(i);
-            map.entry(*c).or_default().insert(pos);
+            map.entry(*c).or_default().push(pos);
         }
     }
     AnnotatedBoard { board, antenna_positions: map }
@@ -156,24 +177,41 @@ fn compute_antinodes(annotated_board: &AnnotatedBoard) -> HashSet<Position> {
     let mut result = HashSet::new();
     let board = &annotated_board.board;
     
-    for y in 0..board.height {
-        for x in 0..board.width {
-            let pos = Position(x,y);
-            'antenna_loop: for (_, positions) in annotated_board.antenna_positions.iter() {
-                for antenna_pos in positions {
-                    let diff = antenna_pos.diff(&pos);
-                    if diff.is_zero() { continue; }
-                    if let Some(double_pos) = pos.add(&diff.mul(2)) {
-                        if positions.contains(&double_pos) {
-                            result.insert(pos.clone());
-                            break 'antenna_loop;
+    for (_, positions) in annotated_board.antenna_positions.iter() {
+        for i in 0..(positions.len() - 1) {
+            for j in (i+1)..positions.len() {
+                let pos1 = &positions[i];
+                let pos2 = &positions[j];
+                let unit = pos1.diff(pos2).shrink();
+                assert!(!unit.is_zero());
+                for unit in [&unit, &unit.reverse()] {
+                    for x in 0.. {
+                        let off = unit.mul(x);
+                        if let Some(pos) = pos1.add(&off) {
+                            if board.within_bounds(&pos) {
+                                // println!("pos1={pos1} pos2={pos2} unit={unit} off={off} antinode={pos}");
+                                result.insert(pos);
+                                // println!("{}", board.render_with_antinodes(result.iter()));
+                                // println!("---------------------------------------------------");
+                                continue;
+                            }
                         }
+                        break;
                     }
                 }
             }
         }
     }
     result
+}
+
+fn gcd(x: isize, y: isize) -> isize {
+    _gcd(x.abs(), y.abs())
+}
+
+fn _gcd(x: isize, y: isize) -> isize {
+    if x == 0 { return y; }
+    _gcd(y % x, x)
 }
 
 fn read_data(filename: &str) -> io::Result<Board> {
@@ -192,9 +230,28 @@ fn read_data(filename: &str) -> io::Result<Board> {
         for c in line.bytes() {
             match c {
                 b'.' => data.push(Square::Empty),
+                b'#' => panic!("Symbol '#' is reserved an cannot appear in input"),
                 c    => data.push(Square::Antenna(c)),
             }
         }
     }
     Ok(Board { data, width: width.expect("non-empty board"), height })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10000))]
+
+        #[test]
+        fn check_gcd(x: isize, y: isize) {
+            let d = gcd(x,y);
+            assert_eq!(0, x % d);
+            assert_eq!(0, y % d);
+        }
+    }
+
 }
