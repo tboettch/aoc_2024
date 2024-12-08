@@ -8,17 +8,24 @@ struct Equation {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Op {Add, Mul}
+enum Op {Add, Mul, Concat}
 
 impl Op {
-    const ALL: [Op; 2] = [Op::Add, Op::Mul];
+    const ALL: [Op; 3] = [Op::Add, Op::Mul, Op::Concat];
 
     fn apply(&self, l: u64, r: u64) -> u64 {
         match self {
             Op::Add => l + r,
             Op::Mul => l * r,
+            Op::Concat => {
+                l * 10u64.pow(mag(r) + 1) + r
+            }
         }
     }
+}
+
+fn mag(x: u64) -> u32 {
+    (x as f64).log10().trunc() as u32
 }
 
 fn main() -> io::Result<()> {
@@ -38,9 +45,10 @@ fn sum_solveable(equations: &[Equation]) -> u64 {
 }
 
 fn solveable(equation: &Equation) -> bool {
-    for total in totals(&equation.components) {
-        // println!(" equation: {equation:?}, total: {total}");
-        if total == equation.total {
+    let totals = totals(&equation.components);
+    // totals.iter().for_each(|total| println!(" equation: {equation:?}, total: {total}"));
+    for total in totals.iter() {
+        if *total == equation.total {
             return true;
         }
     }
@@ -52,10 +60,13 @@ fn totals(vals: &[u64]) -> Vec<u64> {
         return vals.to_vec();
     }
     let subtotals = totals(&vals[..vals.len() - 1]);
-    let mut result = Vec::with_capacity(subtotals.len() * 2);
+    let mut result = Vec::with_capacity(subtotals.len() * Op::ALL.len());
     for op in Op::ALL {
         for subtotal in &subtotals {
-            result.push(op.apply(vals[vals.len() - 1], *subtotal));
+            let rhs = vals[vals.len() - 1];
+            let val = op.apply(*subtotal, rhs);
+            // println!("{:?}({},{})={}", op, *subtotal, rhs, val);
+            result.push(val);
         }
     }
     result
