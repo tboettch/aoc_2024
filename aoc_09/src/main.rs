@@ -15,6 +15,13 @@ impl Block {
             Block::File(_, l) => *l,
         }
     }
+
+    fn get_space(&mut self) -> &mut usize {
+        match self {
+            Block::Free(l) => l,
+            Block::File(_, l) => l,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -35,6 +42,68 @@ impl Disk {
             is_file = !is_file;
         }
         Disk(r)
+    }
+
+    /// Compacts the disk similarly to the algorithm described in the problem description. This implementation moves entire blocks at once, rather than one piece at a time.
+    fn compact(&mut self) {
+        let mut i: usize = 0;
+        while i < self.0.len() {
+            match self.0[i] {
+                Block::Free(free_space) => {
+                    if let Some((file_index, Block::File(id, file_size))) = Disk::last_file(&self.0[i+1..]) {
+                        let file_index = file_index + i + 1;
+                        assert!(file_index > i && file_index < self.0.len());
+                        match file_size.cmp(&free_space) {
+                            std::cmp::Ordering::Less => {
+                                let new_file = Block::File(*id, *file_size);
+                                *self.0[i].get_space() -= *file_size;
+                                self.0.remove(file_index);
+                                self.0.insert(i, new_file);
+                            },
+                            std::cmp::Ordering::Equal => {
+                                let new_file = Block::File(*id, *file_size);
+                                self.0[i] = new_file;
+                                self.0.remove(file_index);
+                            },
+                            std::cmp::Ordering::Greater => {
+                                let new_file = Block::File(*id, free_space);
+                                *self.0[file_index].get_space() -= free_space;
+                                self.0[i] = new_file;
+                            },
+                        }
+                    } else {
+                        break;
+                    }
+                },
+                Block::File(_, _) => (),
+            }
+            i += 1;
+        }
+        self.consolidate();
+    }
+
+    /// Merge adjancent blocks of the same type
+    fn consolidate(&mut self) {
+        let mut i = 0;
+        while i < self.0.len() - 1 {
+            match (&self.0[i], &self.0[i+1]) {
+                (Block::Free(_), Block::Free(_)) => {
+                    *self.0[i].get_space() += self.0[i+1].len();
+                    self.0.remove(i+1);
+                },
+                (Block::File(a, _), Block::File(b, _)) if a == b => {
+                    *self.0[i].get_space() += self.0[i+1].len();
+                    self.0.remove(i+1);
+                },
+                _ => i += 1,
+            }
+        }
+    }
+
+    fn last_file(blocks: &[Block]) -> Option<(usize, &Block)> {
+        blocks.iter().enumerate().rev().find(|block| {
+            if let Block::File(_,_) = block.1 { true } else { false }
+        })
     }
 
     fn checksum(&self) -> usize {
@@ -63,7 +132,7 @@ impl Disk {
                 Block::Free(_) => None,
                 Block::File(c, _) => Some(digits(*c)),
             }
-        }).last().unwrap();
+        }).max().unwrap();
         assert!(width < 2, "string_checksum only works for 1-digit IDs");
         self.to_string().chars().enumerate().map(|(i,c)| {
             match c {
@@ -86,7 +155,7 @@ impl Display for Disk {
                 Block::Free(_) => None,
                 Block::File(c, _) => Some(digits(*c)),
             }
-        }).last().unwrap() as usize;
+        }).max().unwrap() as usize;
         for block in self.0.iter() {
             let len = block.len();
             let width = width * len;
@@ -100,13 +169,18 @@ impl Display for Disk {
 }
 
 fn main() -> io::Result<()> {
-    // let filename = "example.txt";
-    let filename = "example2.txt";
-    // let filename = "input.txt";
+    // let filename = "example.txt"; 
+    // let filename = "example2.txt";
+    let filename = "input.txt";
     let digits = read_input(filename)?;
     println!("{digits:?}");
-    let disk = Disk::parse(&digits);
-    println!("{disk}");
+    let mut disk = Disk::parse(&digits);
+    // println!("{disk}");
+    disk.compact();
+    // println!("disk: {disk}");
+    // println!("disk: {disk:?}");
+    println!("checksum: {}", disk.checksum());
+
     Ok(())
 }
 
@@ -150,6 +224,13 @@ mod tests {
             let digits = parse_digits.parse(&s).unwrap();
             let disk = Disk::parse(&digits);
             assert_eq!(disk.checksum(), disk.string_checksum());
+        }
+
+        #[test]
+        fn check_compact(mut disk: Disk) {
+            // No real test here, just check that it doesn't crash
+            disk.compact();
+            disk.checksum();
         }
     }
 }
