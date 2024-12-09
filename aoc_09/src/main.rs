@@ -1,8 +1,8 @@
-use std::{fmt::Display, fs::File, io::{self, Read}};
+use std::{fmt::Display, fs::File, io::{self, Read}, mem::swap};
 
 use winnow::{ascii::dec_uint, combinator::{repeat, terminated}, token::{literal, one_of}, PResult, Parser};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 enum Block {
     Free(usize),
     File(u32, usize),
@@ -20,6 +20,20 @@ impl Block {
         match self {
             Block::Free(l) => l,
             Block::File(_, l) => l,
+        }
+    }
+
+    /// Modifies this block to be of at most size threshold. If there is more data, it is returned as a separate block.
+    fn split(&mut self, threshold: usize) -> Option<Block> {
+        if threshold >= self.len() {
+            None
+        } else {
+            let total = self.len();
+            let mut clone = self.clone();
+            *clone.get_space() = self.len() - threshold;
+            *self.get_space() = threshold;
+            debug_assert_eq!(total, self.len() + clone.len());
+            Some(clone)
         }
     }
 }
@@ -50,29 +64,17 @@ impl Disk {
         while i < self.0.len() {
             match self.0[i] {
                 Block::Free(free_space) => {
-                    if let Some((file_index, Block::File(id, file_size))) = Disk::last_file(&self.0[i+1..]) {
+                    if let Some(file_index) = Disk::last_file_lte(&self.0[i+1..], free_space) {
                         let file_index = file_index + i + 1;
                         assert!(file_index > i && file_index < self.0.len());
-                        match file_size.cmp(&free_space) {
-                            std::cmp::Ordering::Less => {
-                                let new_file = Block::File(*id, *file_size);
-                                *self.0[i].get_space() -= *file_size;
-                                self.0.remove(file_index);
-                                self.0.insert(i, new_file);
-                            },
-                            std::cmp::Ordering::Equal => {
-                                let new_file = Block::File(*id, *file_size);
-                                self.0[i] = new_file;
-                                self.0.remove(file_index);
-                            },
-                            std::cmp::Ordering::Greater => {
-                                let new_file = Block::File(*id, free_space);
-                                *self.0[file_index].get_space() -= free_space;
-                                self.0[i] = new_file;
-                            },
+                        let file_size = self.0[file_index].len();
+
+                        let leftover = self.0[i].split(file_size);
+                        self.0.swap(i, file_index);
+                        if let Some(leftover) = leftover {
+                            debug_assert!(leftover.len() > 0);
+                            self.0.insert(i + 1, leftover);
                         }
-                    } else {
-                        break;
                     }
                 },
                 Block::File(_, _) => (),
@@ -82,7 +84,10 @@ impl Disk {
         self.consolidate();
     }
 
-    /// Merge adjancent blocks of the same type
+    /// Merge adjancent blocks of the same type. This is not needed to solve the problem.
+    ///
+    /// Note that adjancent File blocks with the same ID should not occur from the above algorithms. These could only occur through
+    /// alternate instantiation of the data structure.
     fn consolidate(&mut self) {
         let mut i = 0;
         while i < self.0.len() - 1 {
@@ -100,10 +105,12 @@ impl Disk {
         }
     }
 
-    fn last_file(blocks: &[Block]) -> Option<(usize, &Block)> {
-        blocks.iter().enumerate().rev().find(|block| {
-            if let Block::File(_,_) = block.1 { true } else { false }
+    /// Finds the index of the last file with size less than or equal to the specified threshold.
+    fn last_file_lte(blocks: &[Block], threshold: usize) -> Option<usize> {
+        blocks.iter().enumerate().rev().find(|(_, block)| {
+            if let Block::File(_,size) = block { *size <= threshold } else { false }
         })
+        .map(|(i,_)| i)
     }
 
     fn checksum(&self) -> usize {
@@ -169,13 +176,14 @@ impl Display for Disk {
 }
 
 fn main() -> io::Result<()> {
-    // let filename = "example.txt"; 
+    // let filename = "example.txt";
     // let filename = "example2.txt";
     let filename = "input.txt";
     let digits = read_input(filename)?;
-    println!("{digits:?}");
+    // println!("{digits:?}");
     let mut disk = Disk::parse(&digits);
     // println!("{disk}");
+    // println!("disk: {disk:?}");
     disk.compact();
     // println!("disk: {disk}");
     // println!("disk: {disk:?}");
