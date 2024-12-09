@@ -24,7 +24,7 @@ impl Block {
     }
 
     /// Modifies this block to be of at most size threshold. If there is more data, it is returned as a separate block.
-    fn split(&mut self, threshold: usize) -> Option<Block> {
+    fn split_over(&mut self, threshold: usize) -> Option<Block> {
         if threshold >= self.len() {
             None
         } else {
@@ -64,16 +64,20 @@ impl Disk {
         while i < self.0.len() {
             match self.0[i] {
                 Block::Free(free_space) => {
-                    if let Some(file_index) = Disk::last_file_lte(&self.0[i+1..], free_space) {
+                    if let Some(file_index) = Self::last_file_lte(&self.0[i+1..], free_space) {
                         let file_index = file_index + i + 1;
-                        assert!(file_index > i && file_index < self.0.len());
+                        debug_assert!(file_index > i && file_index < self.0.len());
                         let file_size = self.0[file_index].len();
 
-                        let leftover = self.0[i].split(file_size);
+                        let leftover = self.0[i].split_over(file_size);
                         self.0.swap(i, file_index);
                         if let Some(leftover) = leftover {
                             debug_assert!(leftover.len() > 0);
                             self.0.insert(i + 1, leftover);
+                        } else {
+                            // Because the file was chosen to be at most the size of the free space
+                            // a lack of leftover in the free space means they must be exactly equal.
+                            debug_assert_eq!(file_size, free_space);
                         }
                     }
                 },
