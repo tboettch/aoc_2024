@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet}, fmt::Display, fs::File, io::{self, prelude::*, BufReader}, ops::{Add, Index, IndexMut, Sub}
+    collections::{HashMap, HashSet}, fmt::Display, fs::File, io::{self, prelude::*, BufReader}, ops::{Add, Index, IndexMut, Mul, Sub}
 };
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Hash)]
@@ -23,6 +23,27 @@ impl Position {
 
     fn add(&self, offset: &Offset) -> Option<Self> {
         Some(Self(self.0.checked_add_signed(offset.0)?, self.1.checked_add_signed(offset.1)?))
+    }
+}
+
+impl Sub for &Position {
+    type Output = Offset;
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.diff(rhs)
+    }
+}
+
+impl Add<&Offset> for &Position {
+    type Output = Option<Position>;
+    fn add(self, rhs: &Offset) -> Self::Output {
+        self.add(rhs)
+    }
+}
+
+impl Mul<isize> for &Offset {
+    type Output = Offset;
+    fn mul(self, rhs: isize) -> Self::Output {
+        self.mul(rhs)
     }
 }
 
@@ -182,13 +203,13 @@ fn compute_antinodes(annotated_board: &AnnotatedBoard) -> HashSet<Position> {
             for j in (i+1)..positions.len() {
                 let pos1 = &positions[i];
                 let pos2 = &positions[j];
-                let unit = pos1.diff(pos2).shrink();
+                let unit = (pos1 - pos2).shrink();
                 assert!(!unit.is_zero());
                 result.insert(pos1.clone());
                 for unit in [&unit, &unit.reverse()] {
                     for x in 1.. {
-                        let off = unit.mul(x);
-                        if let Some(pos) = pos1.add(&off) {
+                        let off = unit * x;
+                        if let Some(pos) = pos1 + &off {
                             if board.within_bounds(&pos) {
                                 // println!("pos1={pos1} pos2={pos2} unit={unit} off={off} antinode={pos}");
                                 result.insert(pos);
