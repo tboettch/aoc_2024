@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 233007ab9a2dd77cd240bc7d44b7c62f8cbee505511ea13e14257008ec6c0c76 # shrinks to disk = Disk([File(0, 0), Free(0), File(1, 0), Free(0), File(2, 0), Free(0), File(3, 0), Free(0), File(4, 0), Free(0), File(5, 0), Free(0), File(6, 0), Free(0), File(7, 0), Free(0), File(8, 0), Free(0), File(9, 0), Free(0), File(10, 2)])
+cc 11b4224ec9c1bcc7907e5edb7751fd7baa4edea2312667bc9183065a254a72ea # shrinks to s = "000000000000000000002\n"
