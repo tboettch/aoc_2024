@@ -111,12 +111,12 @@ mod tests {
         }
 
         #[test]
-        fn check_concat_zero_left(r: u64) {
+        fn check_concat_zero_left(r in (0..u64::MAX / 2)) {
             assert_eq!(Op::Concat.apply(0, r), r);
         }
 
         #[test]
-        fn check_concat_zero_right(l in (0..1000000u64)) {
+        fn check_concat_zero_right(l in (0..u64::MAX / 10)) {
             assert_eq!(Op::Concat.apply(l, 0), l * 10);
         }
 

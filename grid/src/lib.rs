@@ -43,7 +43,7 @@ impl Sub<&Offset> for &Position {
 impl Sub<&Position> for &Position {
     type Output = Offset;
     fn sub(self, rhs: &Position) -> Self::Output {
-        Offset((self.0 - rhs.0) as isize, (self.1 - rhs.1) as isize)
+        Offset(self.0 as isize - rhs.0 as isize, self.1 as isize - rhs.1 as isize)
     }
 }
 
