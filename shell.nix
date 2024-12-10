@@ -3,9 +3,9 @@
 let
     # nix-prefetch-url <url> --unpack
     pkgs = import (builtins.fetchTarball {
-        name = "nixos-24.05-2024-08-21";
-        url = "https://github.com/nixos/nixpkgs/archive/759537f06e6999e141588ff1c9be7f3a5c060106.tar.gz";
-        sha256 = "1an5d5a68ip1bk0l7375jwlrnmg1q9iaxjwymi11z76k4kqch0r9";
+        name = "nixos-24.11-2024-12-06";
+        url = "https://github.com/nixos/nixpkgs/archive/e2605d0744c2417b09f8bf850dfca42fcf537d34.tar.gz";
+        sha256 = "1fsfkdjlqknzxi9jc38a0k0103rlxnjj59xg1s9a5bqb3scaxh9m";
     }) {};
     rustPkgs = pkgs.rust.packages.stable;
     rust-analyzer = pkgs.rust-analyzer.override {
