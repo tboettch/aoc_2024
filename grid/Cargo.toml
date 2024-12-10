@@ -1,0 +1,25 @@
+[package]
+name = "grid"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["arbitrary"]
+arbitrary = ["dep:proptest", "dep:proptest-derive"]
+
+[dependencies]
+proptest = {version = "1.5.0", optional = true}
+proptest-derive = {version = "0.5.0", optional = true}
+
+[dev-dependencies]
+proptest = "1.5.0"
+proptest-derive = "0.5.0"
+
+[profile.test]
+opt-level = 1
+
+[profile.test.package."*"]
+opt-level = 3
+
