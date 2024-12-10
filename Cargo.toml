@@ -1,0 +1,22 @@
+[workspace]
+
+members = [
+    "grid",
+    "aoc_01",
+    "aoc_02",
+    "aoc_03",
+    "aoc_04",
+    "aoc_05",
+    "aoc_06",
+    "aoc_07",
+    "aoc_08",
+    "aoc_09",
+    "aoc_10",
+]
+resolver = "2"
+
+[profile.test]
+opt-level = 1
+
+[profile.test.package."*"]
+opt-level = 3
