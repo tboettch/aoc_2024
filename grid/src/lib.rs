@@ -112,15 +112,26 @@ pub struct Grid<T> {
 }
 
 impl <T> Grid<T> {
+    pub fn new(data: Vec<T>, width: usize, height: usize) -> Grid<T> {
+        Grid {data, width, height}
+    }
+
     pub fn in_bounds(&self, pos: &Position) -> bool {
         pos.0 < self.width && pos.1 < self.height
     }
 
-    fn to_index(&self, pos: &Position) -> usize {
+    fn index_of(&self, pos: &Position) -> usize {
         if !self.in_bounds(pos) {
             panic!("Out of bounds index: {pos}");
         }
-        pos.0 as usize + pos.1 as usize * self.width
+        self.to_index(pos.0, pos.1)
+    }
+
+    fn to_index(&self, x: usize, y: usize) -> usize {
+        if x >= self.width || y >= self.height {
+            panic!("Out of bounds index: ({x},{y})");
+        }
+        x + y * self.width
     }
 
     pub fn width(&self) -> usize {
@@ -130,20 +141,50 @@ impl <T> Grid<T> {
     pub fn height(&self) -> usize {
         self.height
     }
+
+    pub fn map<F, S>(&self, mut f: F) -> Grid<S>
+    where
+        F: FnMut(&T) -> S,
+    {
+        let r = self.data.iter().map(|x| f(x)).collect::<Vec<_>>();
+        Grid { data: r, width: self.width, height: self.height }
+    }
+
+    pub fn iter(&self) -> core::slice::Iter<'_, T> {
+        self.data.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> core::slice::IterMut<'_, T> {
+        self.data.iter_mut()
+    }
 }
 
 impl <T> Index<&Position> for Grid<T> {
     type Output = T;
 
     fn index(&self, pos: &Position) -> &Self::Output {
-        &self.data[self.to_index(pos)]
+        &self.data[self.index_of(pos)]
     }
 }
 
 impl <T> IndexMut<&Position> for Grid<T> {
     fn index_mut(&mut self, pos: &Position) -> &mut Self::Output {
-        let index = self.to_index(pos);
+        let index = self.index_of(pos);
         &mut self.data[index]
+    }
+}
+
+impl <T: Display> Display for Grid<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for y in 0..self.height {
+            for x in 0..self.width {
+                write!(f, "{}", self.data[self.to_index(x,y)])?;
+            }
+            if y < self.height - 1 {
+                writeln!(f, "")?;
+            }
+        }
+        Ok(())
     }
 }
 

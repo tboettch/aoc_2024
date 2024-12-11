@@ -65,6 +65,9 @@ dependencies = [
 [[package]]
 name = "aoc_10"
 version = "0.1.0"
+dependencies = [
+ "grid",
+]
 
 [[package]]
 name = "autocfg"
