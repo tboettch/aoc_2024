@@ -22,7 +22,8 @@ impl Board {
         r
     }
 
-    fn count_trailhead_scores(&self) -> usize {
+    fn count_trailheads_scores(&self) -> usize {
+        // Note: this algorithm proceeds backwards from the summits
         let directions = [Offset::new(0,1), Offset::new(0,-1), Offset::new(1,0), Offset::new(-1,0)];
         let summits = self.find_digit(9);
         let mut visited: Grid<BitSet> = self.grid.map(|_| BitSet::with_capacity(summits.len()));
@@ -44,6 +45,29 @@ impl Board {
         let trailheads = self.find_digit(0);
         trailheads.iter().map(|pos| visited[&pos].len()).sum()
     }
+
+    fn count_trailheads_ratings(&self) -> usize {
+        self.find_digit(0).iter().map(|p| self.count_trailhead_rating(p)).sum()
+    }
+
+    fn count_trailhead_rating(&self, pos: &Position) -> usize {
+        let elevation = self.grid[pos];
+        if elevation == 9 {
+            return 1;
+        }
+
+        let directions = [Offset::new(0,1), Offset::new(0,-1), Offset::new(1,0), Offset::new(-1,0)];
+        let mut sum = 0;
+        for direction in directions.iter() {
+            if let Some(next_pos) = pos + direction {
+                if self.grid.in_bounds(&next_pos) && self.grid[&next_pos] == elevation + 1 {
+                    sum += self.count_trailhead_rating(&next_pos);
+                }
+            }
+        }
+        sum
+    }
+
 }
 
 impl Display for Board {
@@ -57,7 +81,8 @@ fn main() -> io::Result<()> {
     let filename = "input.txt";
     let board = read_data(filename)?;
     // println!("{board}");
-    println!("trailheads sum: {}", board.count_trailhead_scores());
+    println!("trailheads scores sum: {}", board.count_trailheads_scores());
+    println!("trailheads ratings sum: {}", board.count_trailheads_ratings());
 
     Ok(())
 }
