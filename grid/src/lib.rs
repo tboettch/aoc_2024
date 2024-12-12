@@ -157,6 +157,14 @@ impl <T> Grid<T> {
     pub fn iter_mut(&mut self) -> core::slice::IterMut<'_, T> {
         self.data.iter_mut()
     }
+
+    pub fn get(&self, pos: &Position) -> Option<&T> {
+        if self.in_bounds(pos) {
+            Some(&self[pos])
+        } else {
+            None
+        }
+    }
 }
 
 impl <T> Index<&Position> for Grid<T> {
