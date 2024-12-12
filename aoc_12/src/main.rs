@@ -56,7 +56,10 @@ impl Region {
         // An edge is a direction pointing outside this region (including the edge of the map). This is the complement of the adjacency set.
         // If multiple such tiles exist, then multiple corners are formed.
         // The number of corners is equal to the number of sides.
-        // This algorithm double-counts corners, so we divide by two at the end.
+        //
+        // This algorithm double-counts corners because each corner corresponds to two edges: either two perpendicular edges of the same tile (for outside corners) or
+        // perpendicular edges between diagonal tiles (for inside corners).
+        // To correct for this, we divide by two at the end.
         let mut corners: usize = 0;
         for (pos, adj) in adjacencies.iter() {
             let non_adj = adj.complement();
@@ -119,9 +122,12 @@ fn main() -> io::Result<()> {
     // let filename = "example.txt";
     // let filename = "example2.txt";
     // let filename = "example3.txt";
+    // let filename = "test.txt";
     let filename = "input.txt";
     let board = read_data(filename)?;
     let regions = find_regions(&board);
+    // let sides: Vec<usize> = regions.iter().map(Region::count_sides).collect();
+    // println!("{sides:?}");
     let perimeter_price: usize = regions.iter().map(Region::price_by_perimeter).sum();
     println!("perimeter price: {perimeter_price}");
     let sides_price: usize = regions.iter().map(Region::price_by_sides).sum();
