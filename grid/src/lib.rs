@@ -104,7 +104,7 @@ impl Display for Offset {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Grid<T> {
     data: Vec<T>,
     width: usize,
