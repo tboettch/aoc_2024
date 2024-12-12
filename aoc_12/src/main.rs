@@ -1,5 +1,6 @@
-use std::{collections::HashSet, fmt::Display, fs::File, io::{self, BufRead, BufReader}};
+use std::{collections::{HashMap, HashSet}, fmt::Display, fs::File, io::{self, BufRead, BufReader}};
 
+use enumset::{EnumSet, EnumSetType};
 use grid::{Grid, Offset, Position};
 
 type Token = u8;
@@ -36,25 +37,96 @@ impl Region {
         perimeter
     }
 
+    fn count_sides(&self) -> usize {
+        let adjacencies: HashMap<&Position, EnumSet<Direction>> = self.members.iter()
+            .map(|pos| {
+                let mut set: EnumSet<Direction> = EnumSet::new();
+                for dir in Direction::ALL {
+                    if let Some(adj) = pos + &dir.to_offset() {
+                        if self.members.contains(&adj) {
+                            set.insert(dir);
+                        }
+                    }
+                }
+                (pos, set)
+            })
+            .collect();
+
+        // A corner is formed when an adjacent tile in a perpendicular direction lacks the same edge as this tile (including tiles outside this region).
+        // An edge is a direction pointing outside this region (including the edge of the map). This is the complement of the adjacency set.
+        // If multiple such tiles exist, then multiple corners are formed.
+        // The number of corners is equal to the number of sides.
+        // This algorithm double-counts corners, so we divide by two at the end.
+        let mut corners: usize = 0;
+        for (pos, adj) in adjacencies.iter() {
+            let non_adj = adj.complement();
+            for edge in non_adj.iter() {
+                for dir in edge.perpendicular() {
+                    if let Some(adj_pos) = *pos + &dir.to_offset() {
+                        if let Some(other_adj) = adjacencies.get(&adj_pos) {
+                            if other_adj.complement().contains(edge) {
+                                continue;
+                            }
+                        }
+                    }
+                    corners += 1;
+                }
+            }
+        }
+        corners / 2
+    }
+
     fn area(&self) -> usize {
         self.members.len()
     }
 
-    fn price(&self) -> usize {
+    fn price_by_perimeter(&self) -> usize {
         self.perimeter() * self.area()
+    }
+
+    fn price_by_sides(&self) -> usize {
+        // self.perimeter() * self.area()
+        self.count_sides() * self.area()
+    }
+}
+
+#[derive(Debug, EnumSetType)]
+enum Direction {
+    Up, Down, Left, Right
+}
+
+impl Direction {
+    const ALL: [Direction; 4] = [Direction::Up, Direction:: Down, Direction::Left, Direction::Right];
+
+    fn to_offset(&self) -> Offset {
+        match self {
+            Direction::Up => Offset::new(0, -1),
+            Direction::Down => Offset::new(0, 1),
+            Direction::Left => Offset::new(-1, 0),
+            Direction::Right => Offset::new(1, 0),
+        }
+    }
+
+    fn perpendicular(&self) -> [Direction; 2] {
+        match self {
+            Direction::Up | Direction::Down => [Direction::Left, Direction::Right],
+            Direction::Left | Direction::Right => [Direction::Up, Direction::Down],
+        }
     }
 }
 
 fn main() -> io::Result<()> {
     // let filename = "example.txt";
     // let filename = "example2.txt";
+    // let filename = "example3.txt";
     let filename = "input.txt";
     let board = read_data(filename)?;
-    // println!("{board}");
     let regions = find_regions(&board);
-    // println!("{regions:?}");
-    let total_price: usize = regions.iter().map(Region::price).sum();
-    println!("total price: {total_price}");
+    let perimeter_price: usize = regions.iter().map(Region::price_by_perimeter).sum();
+    println!("perimeter price: {perimeter_price}");
+    let sides_price: usize = regions.iter().map(Region::price_by_sides).sum();
+    println!("sides price: {sides_price}");
+    assert!(perimeter_price >= sides_price);
     Ok(())
 }
 
@@ -88,8 +160,8 @@ fn fill_region(board: &Board, region: &mut Region, visited: &mut Grid<bool>, pos
 }
 
 fn adjacent(pos: &Position) -> Vec<Position> {
-    [Offset::new(-1, 0), Offset::new(1, 0), Offset::new(0, 1), Offset::new(0, -1)].iter()
-        .filter_map(|p| pos + &p)
+    Direction::ALL.iter()
+        .filter_map(|d| pos + &d.to_offset())
         .collect()
 }
 
