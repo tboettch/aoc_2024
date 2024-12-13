@@ -19,9 +19,22 @@ impl Machine {
         //
         // Unless the two equations are colinear, this will have exactly one solution.
         // However, the problem calls for only considering non-negative integer solutions.
-        // Furthermore, the input data does not contain any colinear vectors, so we will exclude that
-        // case from consideration. Basic algebra gives the closed form solution below.
-        assert!(!Button::colinear(&self.button_a, &self.button_b), "unexpected colinear vectors: {:?} and {:?}", &self.button_a, &self.button_b);
+        // Basic algebra gives the closed form solution below.
+
+        // Note: No colinear vectors actually occur in the input from the site
+        if Button::colinear(&self.button_a, &self.button_b) {
+            // Because the vectors are colinear, we can compare their magnitude by choosing one of the components arbitrarily.
+            // Per the problem description, button B has a three-times cost advantage.
+            let mag_a = self.button_a.0;
+            let mag_b = self.button_b.0 * 3;
+            let button = if mag_a > mag_b { &self.button_a } else { &self.button_b };
+            let multiple = int_divide(self.prize.0 as i64, button.0 as i64)?;
+            let multiple2 = int_divide(self.prize.1 as i64, button.1 as i64)?;
+            if multiple != multiple2 {
+                return None;
+            }
+            return Some(if mag_a > mag_b { (multiple as u64, 0)} else { (0, multiple as u64) });
+        }
 
         let (x1, y1) = (self.button_a.0 as i64, self.button_a.1 as i64);
         let (x2, y2) = (self.button_b.0 as i64, self.button_b.1 as i64);
@@ -77,7 +90,8 @@ impl Prize {
 
 fn main() -> io::Result<()>{
     // let filename = "example.txt";
-    let filename = "input.txt";
+    let filename = "colinear.txt";
+    // let filename = "input.txt";
     let machines = read_data(filename)?;
     // println!("machines: {machines:?}");
     println!("part 1 min cost: {}", Machine::min_cost_solve_all(&machines));
@@ -161,6 +175,20 @@ mod parser {
 mod tests {
     use super::*;
     use proptest::prelude::*;
+
+    #[test]
+    fn manual_colinear() {
+        let machines = read_data("colinear.txt").unwrap();
+        assert_eq!(2, machines.len());
+        assert!(Button::colinear(&machines[0].button_a, &machines[0].button_b));
+        assert!(Button::colinear(&machines[1].button_a, &machines[1].button_b));
+
+        let sol1 = machines[0].find_solution().unwrap();
+        assert_eq!(sol1.0, 0);
+        let sol2 = machines[1].find_solution().unwrap();
+        assert_eq!(sol2.1, 0);
+        assert!(Machine::cost(sol1) > Machine::cost(sol2));
+    }
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(10000))]
