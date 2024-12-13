@@ -87,6 +87,7 @@ name = "aoc_13"
 version = "0.1.0"
 dependencies = [
  "grid",
+ "proptest",
  "winnow",
 ]
 
