@@ -83,6 +83,19 @@ impl Offset {
     pub fn y(&self) -> isize {
         self.1
     }
+
+    /// Divides each component of this vector by `d` times the corresponding component of the other vector, returning any remainder.
+    /// `d` is the largest value such that neither product exceed's this vector's value.
+    ///
+    /// For now, this only works for non-negative valued vectors.
+    pub fn div_mod_max(&self, other: &Offset) -> (isize, Offset) {
+        assert!(self.0 >= 0 && self.1 >= 0 && other.0 >= 0 && other.1 >= 0);
+        if other.0 > self.0 || other.1 > self.1 {
+            return (0, self.clone())
+        }
+        let d = std::cmp::min(self.0 / other.0, self.1 / other.1);
+        (d, Offset(self.0 % (other.0 * d), self.1 % (other.1 * d)))
+    }
 }
 
 impl Add<&Offset> for &Offset {
@@ -108,10 +121,26 @@ impl Sub<&Offset> for &Offset {
     }
 }
 
+impl Sub<Offset> for &Offset {
+    type Output = Offset;
+    fn sub(self, rhs: Offset) -> Self::Output {
+        Offset(self.0 - rhs.0, self.1 - rhs.1)
+    }
+}
+
 impl Mul<isize> for &Offset {
     type Output = Offset;
     fn mul(self, rhs: isize) -> Self::Output {
         Offset(self.0 * rhs, self.1 * rhs)
+    }
+}
+
+impl Mul<isize> for Offset {
+    type Output = Offset;
+    fn mul(mut self, rhs: isize) -> Self::Output {
+        self.0 *= rhs;
+        self.1 *= rhs;
+        self
     }
 }
 
