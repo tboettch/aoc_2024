@@ -1,4 +1,8 @@
-use std::{fs::File, io::{self, Read}};
+use std::{fs::File, io::{self, Read}, ops::{Add, Mul}};
+
+use grid::Offset;
+
+const MAX_PRESSES: u32 = 100; // Per problem description
 
 #[derive(Debug, Clone)]
 struct Machine {
@@ -7,17 +11,66 @@ struct Machine {
     prize: Prize,
 }
 
+impl Machine {
+    fn all_solutions(&self) -> Vec<(u32, u32)> {
+        use std::cmp::Ordering::*;
+        let target = self.prize.to_offset();
+        let mut r = Vec::new();
+        for x in 0..MAX_PRESSES {
+            for y in 0..MAX_PRESSES {
+                let dest: Offset = &self.button_a.to_offset() * x as isize + &self.button_b.to_offset() * y as isize;
+                match (dest.x().cmp(&target.x()), dest.y().cmp(&target.y())) {
+                    (Equal, Equal) => {
+                        r.push((x.try_into().unwrap(), y.try_into().unwrap()));
+                        break;
+                    },
+                    (Greater, _) | (_, Greater) => break,
+                    _ => ()
+                }
+            }
+        }
+        r
+    }
+
+    fn min_cost_solve_all(machines: &[Machine]) -> u32 {
+        machines.iter()
+            .filter_map(|m|
+                m.all_solutions().iter()
+                    .map(|s| Self::cost(*s))
+                    .min()
+            )
+            .sum()
+    }
+
+    fn cost(counts: (u32, u32)) -> u32 {
+        3 * counts.0 + counts.1
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct Button(u32, u32);
+
+impl Button {
+    fn to_offset(&self) -> Offset {
+        Offset::new(self.0 as isize, self.1 as isize)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct Prize(u32, u32);
 
+impl Prize {
+    fn to_offset(&self) -> Offset {
+        Offset::new(self.0 as isize, self.1 as isize)
+    }
+}
+
 fn main() -> io::Result<()>{
-    let filename = "example.txt";
-    // let filename = "input.txt";
+    // let filename = "example.txt";
+    let filename = "input.txt";
     let machines = read_data(filename)?;
-    println!("machines: {machines:?}");
+    // println!("machines: {machines:?}");
+    println!("min cost: {}", Machine::min_cost_solve_all(&machines));
     Ok(())
 }
 

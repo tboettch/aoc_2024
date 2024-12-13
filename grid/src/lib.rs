@@ -75,12 +75,29 @@ impl Offset {
     pub fn is_zero(&self) -> bool {
         self.0 == 0 && self.1 == 0
     }
+
+    pub fn x(&self) -> isize {
+        self.0
+    }
+
+    pub fn y(&self) -> isize {
+        self.1
+    }
 }
 
 impl Add<&Offset> for &Offset {
     type Output = Offset;
     fn add(self, rhs: &Offset) -> Self::Output {
         Offset(self.0 + rhs.0, self.1 + rhs.1)
+    }
+}
+
+impl Add<Offset> for Offset {
+    type Output = Offset;
+    fn add(mut self, rhs: Offset) -> Self::Output {
+        self.0 += rhs.0;
+        self.1 += rhs.1;
+        self
     }
 }
 
